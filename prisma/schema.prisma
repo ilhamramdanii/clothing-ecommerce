@@ -1,0 +1,282 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// STORE
+// ============================================================
+
+model Store {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  logo        String?
+  banner      String?
+  address     String?
+  city        String?
+  phone       String?
+  email       String?
+  instagram   String?
+  whatsapp    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ============================================================
+// KATEGORI PRODUK
+// ============================================================
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  image     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products  Product[]
+}
+
+// ============================================================
+// PRODUK
+// ============================================================
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  price       Int      // harga dasar dalam Rupiah
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  images      ProductImage[]
+  variants    ProductVariant[]
+  orderItems  OrderItem[]
+}
+
+// ============================================================
+// FOTO PRODUK
+// ============================================================
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  url       String
+  isMain    Boolean @default(false)
+  order     Int     @default(0)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// VARIAN PRODUK (ukuran + warna)
+// ============================================================
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  size      String  // S, M, L, XL, XXL, dll
+  color     String  // nama warna
+  colorHex  String? // kode hex warna (opsional)
+  stock     Int     @default(0)
+  price     Int?    // override harga jika berbeda dari produk
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@unique([productId, size, color])
+}
+
+// ============================================================
+// CUSTOMER (akun pembeli)
+// ============================================================
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses Address[]
+  cart      Cart?
+  orders    Order[]
+}
+
+// ============================================================
+// ALAMAT PENGIRIMAN
+// ============================================================
+
+model Address {
+  id            String   @id @default(cuid())
+  label         String   // Rumah, Kantor, dll
+  recipientName String
+  phone         String
+  address       String
+  city          String
+  province      String
+  postalCode    String
+  isDefault     Boolean  @default(false)
+
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  orders        Order[]
+}
+
+// ============================================================
+// KERANJANG BELANJA
+// ============================================================
+
+model Cart {
+  id        String     @id @default(cuid())
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  customerId String     @unique
+  customer   Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  items      CartItem[]
+}
+
+model CartItem {
+  id       String @id @default(cuid())
+  quantity Int    @default(1)
+
+  cartId    String
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([cartId, variantId])
+}
+
+// ============================================================
+// PESANAN
+// ============================================================
+
+model Order {
+  id              String         @id @default(cuid())
+  orderNumber     String         @unique // contoh: ORD-20260101-001
+  status          OrderStatus    @default(PENDING)
+  paymentStatus   PaymentStatus  @default(UNPAID)
+  paymentMethod   PaymentMethod?
+  subtotal        Int            // total harga produk
+  shippingCost    Int            @default(0)
+  total           Int            // subtotal + ongkir
+  shippingCourier String?        // JNE, J&T, dll
+  shippingService String?        // REG, YES, dll
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  customerId      String
+  customer        Customer       @relation(fields: [customerId], references: [id])
+
+  addressId       String
+  address         Address        @relation(fields: [addressId], references: [id])
+
+  items           OrderItem[]
+  payment         Payment?
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  quantity Int
+  price    Int    // harga saat transaksi (snapshot)
+  subtotal Int    // quantity x price
+
+  orderId   String
+  order     Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product        @relation(fields: [productId], references: [id])
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+}
+
+// ============================================================
+// PEMBAYARAN
+// ============================================================
+
+model Payment {
+  id              String        @id @default(cuid())
+  midtransOrderId String        @unique
+  snapToken       String?
+  snapUrl         String?
+  status          PaymentStatus @default(UNPAID)
+  amount          Int
+  method          String?       // detail metode dari Midtrans
+  paidAt          DateTime?
+  expiredAt       DateTime?
+  rawResponse     Json?         // response mentah dari Midtrans
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  orderId         String        @unique
+  order           Order         @relation(fields: [orderId], references: [id])
+}
+
+// ============================================================
+// ADMIN
+// ============================================================
+
+model AdminUser {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  password  String
+  role      AdminRole @default(STAFF)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// ============================================================
+// ENUM
+// ============================================================
+
+enum OrderStatus {
+  PENDING      // menunggu pembayaran
+  PAID         // sudah dibayar
+  PROCESSING   // sedang diproses/dikemas
+  SHIPPED      // sudah dikirim
+  DELIVERED    // sudah diterima
+  CANCELLED    // dibatalkan
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  EXPIRED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MIDTRANS // semua metode via Midtrans
+  MANUAL   // transfer manual (konfirmasi admin)
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  STAFF
+}
