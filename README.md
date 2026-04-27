@@ -47,7 +47,7 @@ The project leverages the modern Next.js architecture to ensure structured and m
 
 1.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/username/clothing-ecommerce.git
+    git clone https://github.com/ilhamramdanii/clothing-ecommerce.git
     cd clothing-ecommerce
     ```
 
